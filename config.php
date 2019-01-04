@@ -1,2 +1,2 @@
 <?php
-defined('TOKEN', 'zxmgzh123');
+define('TOKEN', 'zxmgzh123');
