@@ -39,6 +39,14 @@ function getInputData($m = ''){
     return $data;
 }
 
+/**
+ * 日志
+ *
+ */
+function writeLog($str = ''){
+    file_put_contents("./gzh.log", date("Y-m-d h:i:s").' '.$str, FILE_APPEND);  
+}
+
 function wwwLog($str = ''){
     if(empty($str)){
         $str = 'http://' . $_SERVER['HTTP_HOST'] . $_SERVER['PHP_SELF'];

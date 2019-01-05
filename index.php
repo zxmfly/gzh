@@ -1,4 +1,5 @@
 <?php
+date_default_timezone_set('Asia/Shanghai');
 include './config.php';
 include './functions.php';
 include './Gzh.class.php';

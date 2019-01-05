@@ -5,6 +5,7 @@ class GzhClass
 	public $token = '';
 	public $msgType = '';
 	public $event = '';
+	public $content = '';
 	public function __construct()
 	{	
 		$this->token = TOKEN;
@@ -31,7 +32,7 @@ class GzhClass
 	function decodeMsg(){
 		//1、收到微信推送过来的消息
 		$xml = getInputData('origin');
-		wwwLog($xml);
+		
 		//2、处理消息类型，并设置回复类型和内容
 		/*
 		ToUserName	开发者微信号
@@ -43,25 +44,69 @@ class GzhClass
 		$obj = simplexml_load_string($xml);
 		$this->msgType = strtolower($obj->MsgType);
 		$this->event = strtolower($obj->Event);
+		$this->content = strtolower($obj->Content);
+		$replyData['touser'] = $obj->FromUserName;
+		$replyData['fromuser'] = $obj->ToUserName;
+
 		//消息类型
 		if($this->msgType == 'event'){
 			//事件类型
 			if($this->event == 'subscribe'){
-				//回复用户消息
-				$touser = $obj->FromUserName;
-				$fromuser = $obj->ToUserName;
-				$ctime = time();
-				$mtype = 'text';
-				$content = '欢迎关注我的微信公众账号！';
-
-				$template = "<xml> <ToUserName><![CDATA[%s]]></ToUserName> <FromUserName><![CDATA[%s]]></FromUserName> <CreateTime>%s</CreateTime> <MsgType><![CDATA[%s]]></MsgType> <Content><![CDATA[%s]]></Content> </xml>";
-
-				$info = sprintf($template, $touser, $fromuser, $ctime, $mtype, $content);
-				echo $info;
+				$str = "账号：{$replyData['touser']}, 关注";
+				writeLog($str);
+				$replyData['content'] = '你好！我是ZXM，欢迎你关注我的公众号！';
+				self::printXmlText($replyData);
+			}else{
+				$str = "账号：{$replyData['touser']}, 取消关注";
+				writeLog($str);
 			}
+		}elseif($this->msgType == 'text'){
+			if(is_numeric($this->content)) {
+				$content = "你输入的是数字:".$this->content;
+				$this->content = '数字';
+			}
+			switch($this->content){
+				case '你好':
+					$content = '你好！我是zxm,很高兴认识你,今天依然要保持微笑哟~';
+					break;
+				case 'hello':
+					$content = 'Hello, it was a pleasure seeing you.';
+					break;
+				case '姓名':
+					$content = '你好！我叫峻峻，很高兴认识你！';
+					break;
+				case '年龄':
+					$content = '虽然我是男人，但是我也不会告诉你已经30多岁咯~';
+					break;
+				case '爱你':
+					$content = '爱你，爱你，爱着你！就是爱你！';
+					break;
+				case '数字':
+					break;
+				default:
+					$content = '你输入的是:'.$this->content.'，对不起，我不太懂，我还在完善中，你可以试试问姓名、年龄、爱你...';
+					break;
+			}
+			$replyData['content'] = $content;
+			self::printXmlText($replyData);
 		}else{
-			wwwLog('event错误');
+			$replyData['content'] = "模块还在建设中，敬请期待！";
+			self::printXmlText($replyData);
 		}
+	}
+
+	function printXmlText($data){
+		$touser = $data['touser'];
+		$fromuser = $data['fromuser'];
+		$ctime = time();
+		$mtype = 'text';
+		$content = $data['content'];
+
+		$template = "<xml> <ToUserName><![CDATA[%s]]></ToUserName> <FromUserName><![CDATA[%s]]></FromUserName> <CreateTime>%s</CreateTime> <MsgType><![CDATA[%s]]></MsgType> <Content><![CDATA[%s]]></Content> </xml>";
+
+		$info = sprintf($template, $touser, $fromuser, $ctime, $mtype, $content);
+		echo $info;
+		return;
 	}
 
 }
