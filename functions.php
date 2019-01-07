@@ -44,7 +44,7 @@ function getInputData($m = ''){
  *
  */
 function writeLog($str = ''){
-    file_put_contents("./gzh.log", date("Y-m-d h:i:s").' '.$str, FILE_APPEND);  
+    file_put_contents("./gzh.log", date("Y-m-d h:i:s")." {$str}\r\n", FILE_APPEND);  
 }
 
 function wwwLog($str = ''){
