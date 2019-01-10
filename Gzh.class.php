@@ -2,18 +2,20 @@
 namespace gzh;
 class GzhClass
 {	
-	public $token = '';
 	public $msgType = '';
 	public $event = '';
 	public $content = '';
 	public $replyData = [];
-	public function __construct()
+	private $config = [];
+	private $access_token = '';
+	private $db_users = 'g_users';
+	public function __construct($config)
 	{	
 		wwwLog();
-		$this->token = TOKEN;
+		$this->config = $config;
 		$data = getInputData();
 		if(empty($data)) die('error');
-		$tmpArr = [$this->token, $data['timestamp'], $data['nonce']];
+		$tmpArr = [$this->config['token'], $data['timestamp'], $data['nonce']];
 	    sort($tmpArr, SORT_STRING);
 	    $tmpStr = sha1( implode( $tmpArr ) );
 
@@ -22,12 +24,40 @@ class GzhClass
 	    		echo $data['echostr'];
 	        	exit;
 	    	}else{
+	    		$this->$access_token = self::getAccessToken();
 	    		$this->decodeMsg();
 	    	}
 	    }else{
 	    	echo '验证失败';
-	        return false;
 	    }
+	}
+
+
+	private function WxApiHandle($type){
+		$url = 'https://api.weixin.qq.com/cgi-bin/token';
+		$data = [
+			'appid' => $this->config['appid'],
+			'secret' => $this->config['secret'],
+			'grant_type' => $type,
+		];
+		$rs = compact('url', 'data');
+		return $rs;
+	}
+
+	//access_token的有效期目前为2个小时，需定时刷新，重复获取将导致上次获取的access_token失效。
+	public function getAccessToken(){
+		$access_token = getCache(ACCESS_TOKEN_CKEY);
+
+		if(!$access_token){
+			$info = self::WxApiHandle('client_credential');
+			$rs = Curl::makeRequest($info['url'], $info['data'], 'get', 1);
+			$rs = json_decode($rs, 1);
+			$access_token = $rs['access_token'];
+			$cache_time = $rs['expires_in'] - 120;//提前2分钟过期
+			setCache(ACCESS_TOKEN_CKEY, $access_token, $cache_time);
+		}
+
+		return $access_token;
 	}
 
 	//解析内容
@@ -35,15 +65,7 @@ class GzhClass
 		//1、收到微信推送过来的消息
 		$xml = getInputData('origin');
 		wwwLog($xml);
-
 		//2、处理消息类型，并设置回复类型和内容
-		/*
-		ToUserName	开发者微信号
-		FromUserName	发送方帐号（一个OpenID）
-		CreateTime	消息创建时间 （整型）
-		MsgType	消息类型，event
-		Event	事件类型，subscribe(订阅)、unsubscribe(取消订阅)
-		*/
 		$obj = simplexml_load_string($xml);
 		$this->msgType = strtolower($obj->MsgType);
 		$this->event = strtolower($obj->Event);
@@ -56,11 +78,13 @@ class GzhClass
 
 			//事件类型
 			if($this->event == 'subscribe'){
+				self::checkUserInfo();
 				$str = "账号：".$this->replyData['touser'].", 关注";
 				writeLog($str);
 				$this->replyData['content'] = '你好！我是ZXM，欢迎你关注我的公众号！';
 				self::printXmlText($this->replyData);
 			}else{
+				self::checkUserInfo('unload');
 				$str = "账号：".$this->replyData['touser'].", 取消关注";
 				writeLog($str);
 			}
@@ -78,18 +102,47 @@ class GzhClass
 		return;
 	}
 
+	function checkUserInfo($type = 'in'){
+		$openId = $this->replyData['touser'];
+
+		$rs = Mysql::selectMemcache($this->db_users, ['id'], compact('openId'), 'and', '', 1800);
+		if($rs) return;
+		if($type == 'in'){
+			$utime = time();
+			Mysql::insert($this->db_users, compact('openId','utime'));
+		}else{
+			$unload = time();
+			Mysql::update($this->db_users, compact('unload'), compact('openId'));
+		}
+
+		return;
+	}
+
 	function checkText(){
 		if(is_numeric($this->content)) {
 			$content = "你输入的是数字:".$this->content;
 			$this->content = '数字';
 
 		}elseif($this->content == '图文' || $this->content == 'news'){
+			//图文消息个数；当用户发送文本、图片、视频、图文、地理位置这五种消息时，开发者只能回复1条图文消息；其余场景最多可回复8条图文消息 如果图文数超过限制，则将只发限制内的条数
 			$items =[ 
 				[
 					'title' => '广州酷游',
 					'desc'	=> '广州酷游官网',
 					'picurl' => 'http://www.gzkuyou.com/static/img/logo.jpg',
 					'url'	=> 'http://www.gzkuyou.com',
+				],
+				[
+					'title' => '百度',
+					'desc'	=> '百度一下',
+					'picurl' => 'https://www.baidu.com/img/bd_logo1.png?where=super',
+					'url'	=> 'https://www.baidu.com/',
+				],
+				[
+					'title' => '腾讯',
+					'desc'	=> '腾讯网首页',
+					'picurl' => 'https://mat1.gtimg.com/pingjs/ext2020/qqindex2018/dist/img/qq_logo_2x.png',
+					'url'	=> 'https://www.qq.com/',
 				]
 			];
 			$this->replyData['items'] = $items;
@@ -147,18 +200,21 @@ class GzhClass
 		$fromuser = $data['fromuser'];
 		$ctime = time();
 		$mtype = 'news';
-		$count = count($data['items']);
 		$items = $data['items'];
+		$count = count($items) <= 8 ? count($items) : 8;
 
 		$template = "<xml><ToUserName><![CDATA[%s]]></ToUserName><FromUserName><![CDATA[%s]]></FromUserName><CreateTime>%s</CreateTime><MsgType><![CDATA[%s]]></MsgType><ArticleCount>%s</ArticleCount><Articles>";
+		$i = 1;
 		foreach ($items as $key => $v) {
+			if($i > 8) break;
 			$template .= "<item><Title><![CDATA[{$v['title']}]]></Title> <Description><![CDATA[{$v['desc']}]]></Description><PicUrl><![CDATA[{$v['picurl']}]]></PicUrl><Url><![CDATA[{$v['url']}]]></Url></item>";
+			$i ++;
 		}
 		$template .= "</Articles></xml>";
 
 		$info = sprintf($template, $touser, $fromuser, $ctime, $mtype, $count);
+
 		echo $info;
 		return;
 	}
-
 }

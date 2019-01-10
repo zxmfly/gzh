@@ -1,5 +1,34 @@
 <?php
 
+/**
+ * 获取memcache
+ * @param $key
+ */
+function getCache($key){
+    global $memcache;
+    $key = md5($key);
+    $rs = $memcache->get($key);
+    return $rs;
+}
+
+/**
+ * 获取memcache
+ * @param string $key
+ * @param mixed $value
+ * @param int $ttl
+ */
+function setCache($key, $value, $ttl=-1){
+    global $memcache;
+    $key = md5($key);
+    if($ttl > 0){
+        $memcache->set($key, $value, false, $ttl);
+    }
+    else{
+        $memcache->set($key, $value);
+    }
+    return true;
+}
+
 /*
 * 获取 $_SERVER['QUERY_STRING'] 原始数据
 * parse_str,GET 会自动urldecode,对于“+”会变成空格
