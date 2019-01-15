@@ -15,7 +15,7 @@ class GzhClass
 		wwwLog();
 		$this->config = $config;
 		$data = getInputData();
-/*
+
 		if(empty($data)) die('error');
 		$tmpArr = [$this->config['token'], $data['timestamp'], $data['nonce']];
 	    sort($tmpArr, SORT_STRING);
@@ -34,7 +34,7 @@ class GzhClass
 	    }else{
 	    	echo '验证失败';
 	    }
-	    */
+	    
 	    
 	}
 

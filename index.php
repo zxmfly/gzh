@@ -23,9 +23,3 @@ if(!$memcache) {
 }
 
 $gzh = new GzhClass($WxGzhConfig);
-
-$gzh->content = '天气';
-
-echo $gzh->content;
-
-$gzh->getTianqi();
