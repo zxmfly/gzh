@@ -8,12 +8,14 @@ class GzhClass
 	public $replyData = [];
 	private $config = [];
 	private $access_token = '';
+	private $wxIpList = [];
 	private $db_users = 'g_users';
 	public function __construct($config)
 	{	
 		wwwLog();
 		$this->config = $config;
 		$data = getInputData();
+/*
 		if(empty($data)) die('error');
 		$tmpArr = [$this->config['token'], $data['timestamp'], $data['nonce']];
 	    sort($tmpArr, SORT_STRING);
@@ -24,17 +26,20 @@ class GzhClass
 	    		echo $data['echostr'];
 	        	exit;
 	    	}else{
-	    		$this->$access_token = self::getAccessToken();
+	    		$this->access_token = self::getAccessToken();
+	    		$this->wxIpList = self::getWxIp();
+	 			if(!checkIp($this->wxIpList)) exit('IP forbid');
 	    		$this->decodeMsg();
 	    	}
 	    }else{
 	    	echo '验证失败';
 	    }
+	    */
+	    
 	}
 
-
-	private function WxApiHandle($type){
-		$url = 'https://api.weixin.qq.com/cgi-bin/token';
+	private function WxApiHandle($type = ''){
+		$url = 'https://api.weixin.qq.com/cgi-bin/';
 		$data = [
 			'appid' => $this->config['appid'],
 			'secret' => $this->config['secret'],
@@ -45,12 +50,13 @@ class GzhClass
 	}
 
 	//access_token的有效期目前为2个小时，需定时刷新，重复获取将导致上次获取的access_token失效。
+	//需要存数据库，或者文件，才比较保险
 	public function getAccessToken(){
 		$access_token = getCache(ACCESS_TOKEN_CKEY);
 
-		if(!$access_token){
+		if(empty($access_token)){
 			$info = self::WxApiHandle('client_credential');
-			$rs = Curl::makeRequest($info['url'], $info['data'], 'get', 1);
+			$rs = Curl::makeRequest($info['url'].'token', $info['data']);
 			$rs = json_decode($rs, 1);
 			$access_token = $rs['access_token'];
 			$cache_time = $rs['expires_in'] - 120;//提前2分钟过期
@@ -58,6 +64,35 @@ class GzhClass
 		}
 
 		return $access_token;
+	}
+
+	public function getWxIp(){
+		$wxIps = getCache(WX_IP_LIST_CKEY);
+		if(empty($wxIps)){
+			$data['access_token'] = $this->access_token;
+			$info = self::WxApiHandle();
+			$rs = Curl::makeRequest($info['url'].'getcallbackip', $data);
+			$d = json_decode($rs, 1);
+			$wxIps = $d['ip_list'];
+			foreach ($wxIps as $key => $value) {
+				$start = strpos($value, '/');//存在ip地址段 "101.226.103.0/25"   
+				if($start){
+					$ipArr = explode('.', $value);
+					$numArr = explode('/', $ipArr[3]);
+					$i = $numArr[0];
+					$max = $numArr[1];
+					unset($ipArr[3]);
+					$ip_str = implode('.', $ipArr);
+					for ($i; $i<=$max; $i++) { 
+						$wxIps[] = $ip_str.'.'.$i;
+					}
+					unset($wxIps[$key]);
+				}
+			}
+			setCache(WX_IP_LIST_CKEY, $wxIps, 7200);
+		}
+
+		return $wxIps;
 	}
 
 	//解析内容
@@ -132,21 +167,13 @@ class GzhClass
 					'picurl' => 'http://www.gzkuyou.com/static/img/logo.jpg',
 					'url'	=> 'http://www.gzkuyou.com',
 				],
-				[
-					'title' => '百度',
-					'desc'	=> '百度一下',
-					'picurl' => 'https://www.baidu.com/img/bd_logo1.png?where=super',
-					'url'	=> 'https://www.baidu.com/',
-				],
-				[
-					'title' => '腾讯',
-					'desc'	=> '腾讯网首页',
-					'picurl' => 'https://mat1.gtimg.com/pingjs/ext2020/qqindex2018/dist/img/qq_logo_2x.png',
-					'url'	=> 'https://www.qq.com/',
-				]
 			];
 			$this->replyData['items'] = $items;
 			self::printXmlNews($this->replyData);
+
+			return;
+		}elseif(strpos($this->content, '天气') !== false){
+			self::getTianqi();
 
 			return;
 		}
@@ -172,12 +199,28 @@ class GzhClass
 				$content = "<a href='http://www.baidu.com'>百度一下</a>，你点击下试试";
 				break;
 			default:
-				$content = '你输入的是:'.$this->content.'，对不起，我不太懂，我还在完善中，你可以试试问姓名、年龄、爱你...';
+				$content = '你输入的是:'.$this->content.'，对不起，我不太懂，你可以试试发“天气”';
 				break;
 		}
 		$this->replyData['content'] = $content;
 		self::printXmlText($this->replyData);
 		return;
+	}
+	//天气查询
+	function getTianqi(){
+		$tqArr = GaoDe::getTianqi($this->content);
+		$content = '';
+		foreach ($tqArr as $key => $value) {
+			if(empty($value)){
+				$content .= "对不起，你输入的城市:{$key},没有查询到天气信息，请查验后再发\n------------------------\n";
+			}else{
+				$content .= $value."\n------------------------\n";
+			}
+		}
+
+		$content .= '温馨提示：输入“天气”查看当前所在城市的天气，也可输入“天气:城市1:城市2:城市3"查看该城市的天气，最多可同时查询3个城市的天气哟~';
+		$this->replyData['content'] = $content;
+		self::printXmlText($this->replyData);
 	}
 
 	//回复纯文本

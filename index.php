@@ -5,6 +5,7 @@ include './functions.php';
 include './Curl.php';
 include './Mysql.php';
 include './Memcache.php';
+include './GaoDe.php';
 include './Gzh.class.php';
 
 //首先要验证token
@@ -13,6 +14,7 @@ use gzh\GzhClass;
 use gzh\MemcacheClass;
 use gzh\Mysql;
 use gzh\Curl;
+use gzh\GaoDe;
 
 global $memcache, $mysql;
 if(!$memcache) {
@@ -22,3 +24,8 @@ if(!$memcache) {
 
 $gzh = new GzhClass($WxGzhConfig);
 
+$gzh->content = '天气';
+
+echo $gzh->content;
+
+$gzh->getTianqi();
