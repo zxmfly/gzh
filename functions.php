@@ -1,5 +1,20 @@
 <?php
 
+function getWeek($w = '', $all = 1){
+    $w = $w ? $w : date('w');
+    $week = array(
+        0 => "日",
+        1 => "一",
+        2 => "二",
+        3 => "三",
+        4 => "四",
+        5 => "五",
+        6 => "六"
+    );
+    $str = $all ? '星期'.$week[$w] : $week[$w];
+    return $str;
+}
+
 /**
  * 获取IP
  */

@@ -35,7 +35,7 @@ class GzhClass
 	    	echo '验证失败';
 	    }
 	    
-	    
+	   
 	}
 
 	private function WxApiHandle($type = ''){
@@ -212,13 +212,13 @@ class GzhClass
 		$content = '';
 		foreach ($tqArr as $key => $value) {
 			if(empty($value)){
-				$content .= "对不起，你输入的城市:{$key},没有查询到天气信息，请查验后再发\n------------------------\n";
+				$content .= "对不起，你输入的城市:{$key},没有查询到天气信息，请查验后再发\n--------------------------------------\n";
 			}else{
-				$content .= $value."\n------------------------\n";
+				$content .= $value."\n--------------------------------------\n";
 			}
 		}
 
-		$content .= '温馨提示：输入“天气”查看当前所在城市的天气，也可输入“天气:城市1:城市2:城市3"查看该城市的天气，最多可同时查询3个城市的天气哟~';
+		$content .= '温馨提示：输入“天气”查看当前所在城市的天气，也可输入“天气:城市1:城市2:城市3"查看该城市的天气,例如“天气:广州黄埔区”，最多可同时查询3个城市的天气哟~';
 		$this->replyData['content'] = $content;
 		self::printXmlText($this->replyData);
 	}

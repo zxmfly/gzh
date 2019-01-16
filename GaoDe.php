@@ -15,7 +15,6 @@ class GaoDe{
 			$content = str_replace(",", ':', $content);
 			$content = str_replace("+", ':', $content);
 			$content = str_replace("_", ':', $content);
-			$content = str_replace("-", ':', $content);
 			$content = str_replace("：", ':', $content);
 
 			$tqArr = explode(':', $content);
@@ -39,8 +38,8 @@ class GaoDe{
 
 		return $result;
 	}
-
-	function formatTianqi($arr){
+	//实时天气
+	function formatTianqiBase($arr){
 		$str = "城市：{$arr['city']} \n".
 				"天气：{$arr['weather']} \n".
 				"温度：{$arr['temperature']} \n".
@@ -50,18 +49,47 @@ class GaoDe{
 				"时间：{$arr['reporttime']}";
 		return $str;
 	}
+	//预报天气
+	function formatTianqiAll($arr){
+		$str = "日期：{$arr['date']} \n".
+				"星期：".getWeek($arr['week'])." \n".
+				"天气：day {$arr['dayweather']} ~ night {$arr['nightweather']} \n".
+				"温度：day {$arr['daytemp']} ~ night {$arr['nighttemp']} \n".
+				"风向：day {$arr['daywind']} ~ night {$arr['nightwind']} \n".
+				"风级：day {$arr['daypower']} ~ night {$arr['nightpower']}\n";
+		return $str;
+	}
 
 	function getWeather($adcode){
 		$info = getCache('weather_'.$adcode);
 		if($info) return $info;
-
+		$ext = 'all';
 		$info = self::handle('weather/weatherInfo');
 		$data = $info['data'];
 		$data['city'] = $adcode;
+		$data['extensions'] = $ext;//默认base,只有当前天气
 		$re = Curl::makeRequest($info['url'], $data);
 		$rs = json_decode($re, 1);
 		if($rs['status'] == 1){
-			$info = self::formatTianqi($rs['lives'][0]);
+			if($ext == 'base'){
+				$info = self::formatTianqiBase($rs['lives'][0]);//实时天气
+			}else{
+				$info = '';
+				foreach ($rs['forecasts'][0] as $key => $value) {
+					if($key == 'city'){
+						$info = "城市：{$value} \n ----------\n";
+					}
+					elseif($key == 'casts'){
+						$c = count($value);
+						foreach ($value as $k => $v) {
+							$info .= self::formatTianqiAll($v);
+							if($k < $c -1) $info .= "-------------------------------------- \n ";
+						}		
+					}else{
+						continue;
+					}
+				}
+			}
 			setCache('weather_'.$adcode, $info, 3600*4);
 			return $info;
 		}
