@@ -23,3 +23,5 @@ if(!$memcache) {
 }
 
 $gzh = new GzhClass($WxGzhConfig);
+
+//测试下远程仓库
