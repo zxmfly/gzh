@@ -12,7 +12,7 @@ class Curl
     {
         if (is_string($params))
             return $params;
-        if ('JOSN' == strtoupper($method))
+        if ('JSON' == strtoupper($method))
             return json_encode($params);
             
         $query_string = array();
@@ -57,8 +57,13 @@ class Curl
         {
             curl_setopt($ch, CURLOPT_URL, $url);
             curl_setopt($ch, CURLOPT_POST, TRUE);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $query_string);//传递一个作为HTTP “POST”操作的所有数据的字符串
-            //也可以直接使用$params
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $query_string);//传递一个作为HTTP “POST”操作的所有数据的字符串//也可以直接使用$params(只能使用一维数据)
+
+            if ('JSON' == strtoupper($method))
+                $headerArr = [
+                    'Content-Type: application/json; charset=utf-8',
+                    'Content-Length: ' . strlen($query_string)
+                ];
         } 
 
         curl_setopt($ch, CURLOPT_HEADER, FALSE);//设定是否输出页面内容

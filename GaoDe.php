@@ -52,7 +52,7 @@ class GaoDe{
 	//预报天气
 	function formatTianqiAll($arr){
 		$str = "日期：{$arr['date']} \n".
-				"星期：".getWeek($arr['week'])." \n".
+				"星期：".getWeek($arr['week'], 0)." \n".
 				"天气：day {$arr['dayweather']} ~ night {$arr['nightweather']} \n".
 				"温度：day {$arr['daytemp']} ~ night {$arr['nighttemp']} \n".
 				"风向：day {$arr['daywind']} ~ night {$arr['nightwind']} \n".

@@ -28,14 +28,12 @@ class GzhClass
 	    	}else{
 	    		$this->access_token = self::getAccessToken();
 	    		$this->wxIpList = self::getWxIp();
-	 			if(!checkIp($this->wxIpList)) exit('IP forbid');
+	 			if(!checkIp($this->wxIpList) && getIP() != '125.88.171.98') exit('IP forbid');
 	    		$this->decodeMsg();
 	    	}
 	    }else{
 	    	echo '验证失败';
 	    }
-	    
-	   
 	}
 
 	private function WxApiHandle($type = ''){
@@ -61,6 +59,7 @@ class GzhClass
 			$access_token = $rs['access_token'];
 			$cache_time = $rs['expires_in'] - 120;//提前2分钟过期
 			setCache(ACCESS_TOKEN_CKEY, $access_token, $cache_time);
+			writeLog($access_token);//记录token
 		}
 
 		return $access_token;
@@ -110,18 +109,27 @@ class GzhClass
 
 		//消息类型
 		if($this->msgType == 'event'){
-
 			//事件类型
-			if($this->event == 'subscribe'){
+			if($this->event == 'subscribe'){//关注，扫码关注
 				self::checkUserInfo();
 				$str = "账号：".$this->replyData['touser'].", 关注";
 				writeLog($str);
-				$this->replyData['content'] = '你好！我是ZXM，欢迎你关注我的公众号！';
+				$content = '你好！我是ZXM，欢迎你关注我的公众号！';
+				if(isset($obj->EventKey) && strpos($obj->EventKey, 'qrscene_') !== false){//扫码关注
+					$scene_id = end(explode('qrscene_', $obj->EventKey));
+					$content = "欢迎您，来自场景".$scene_id."扫码关注的朋友！";
+				}
+				$this->replyData['content'] = $content;
 				self::printXmlText($this->replyData);
-			}else{
+			}elseif($this->event == 'unsubscribe'){
 				self::checkUserInfo('unload');
 				$str = "账号：".$this->replyData['touser'].", 取消关注";
 				writeLog($str);
+			}//二维码扫码已关注，扫码事件
+			elseif($this->event == 'scan'){
+				$content = $obj->EventKey > 2000 ? '永久二维码' : '临时二维码';
+				$this->replyData['content'] = $content.'用户欢迎你！';
+				self::printXmlText($this->replyData);
 			}
 
 		}elseif($this->msgType == 'text'){
@@ -154,11 +162,7 @@ class GzhClass
 	}
 
 	function checkText(){
-		if(is_numeric($this->content)) {
-			$content = "你输入的是数字:".$this->content;
-			$this->content = '数字';
-
-		}elseif($this->content == '图文' || $this->content == 'news'){
+		if($this->content == '图文' || $this->content == 'news'){
 			//图文消息个数；当用户发送文本、图片、视频、图文、地理位置这五种消息时，开发者只能回复1条图文消息；其余场景最多可回复8条图文消息 如果图文数超过限制，则将只发限制内的条数
 			$items =[ 
 				[
@@ -176,6 +180,54 @@ class GzhClass
 			self::getTianqi();
 
 			return;
+		}elseif($this->content == '二维码'){
+			self::cQrcode();
+
+			return;
+		}else{
+			self::checkContent();
+
+			return;
+		}
+
+		return;
+	}
+
+	//生成推广二维码（认证公众号才能使用）
+	function cQrcode(){
+		$config = QrcodeConfig();
+		//先获取ticket
+		$url = "https://api.weixin.qq.com/cgi-bin/qrcode/create?access_token=".$this->access_token;
+		//{"expire_seconds": 604800, "action_name": "QR_SCENE", "action_info": {"scene": {"scene_id": 123}}}
+		$data = $config;
+		$rs = Curl::makeRequest($url, $data, 'json');
+		$d = json_decode($rs, 1);
+		if(isset($d['ticket'])){//获取临时二维码
+			$ticket = $d['ticket'];
+			$url = 'https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket='.urlencode($ticket);
+			//返回的是一张图片，可直接使用，也可以保存
+			//echo "< img src='{$url}'/>";
+			$items =[ 
+				[
+					'title' => '扫码关注',
+					'desc'	=> '收藏二维码不迷路',
+					'picurl' => $url,
+					'url'	=> $url,
+				],
+			];
+			$this->replyData['items'] = $items;
+			self::printXmlNews($this->replyData);
+
+		}else{
+			$this->replyData['content'] = '接口返回失败:'.$rs;
+			self::printXmlText($this->replyData);
+		}
+	}
+	//文字回复
+	function checkContent(){
+		if(is_numeric($this->content)) {
+			$content = "你输入的是数字:".$this->content;
+			$this->content = '数字';
 		}
 		switch($this->content){
 			case '你好':
@@ -199,13 +251,28 @@ class GzhClass
 				$content = "<a href='http://www.baidu.com'>百度一下</a>，你点击下试试";
 				break;
 			default:
-				$content = '你输入的是:'.$this->content.'，对不起，我不太懂，你可以试试发“天气”';
+				$content = 'baidu';
 				break;
 		}
-		$this->replyData['content'] = $content;
-		self::printXmlText($this->replyData);
+		if($content != 'baidu'){
+			$this->replyData['content'] = $content;
+			self::printXmlText($this->replyData);
+		}else{
+			$items =[ 
+				[
+					'title' => $this->content,
+					'desc'	=> "要查询的内容:".$this->content,
+					'picurl' => 'https://ss0.bdstatic.com/5aV1bjqh_Q23odCf/static/superman/img/logo_top_86d58ae1.png',
+					'url'	=> 'https://www.baidu.com/s?wd='.$this->content,
+				],
+			];
+			$this->replyData['items'] = $items;
+			self::printXmlNews($this->replyData);
+		}
+
 		return;
 	}
+
 	//天气查询
 	function getTianqi(){
 		$tqArr = GaoDe::getTianqi($this->content);
