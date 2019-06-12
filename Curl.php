@@ -13,7 +13,7 @@ class Curl
         if (is_string($params))
             return $params;
         if ('JSON' == strtoupper($method))
-            return json_encode($params);
+            return json_encode($params, JSON_UNESCAPED_UNICODE);
             
         $query_string = array();
         foreach ($params as $key => $value)

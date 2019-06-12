@@ -10,6 +10,7 @@ class GzhClass
 	private $access_token = '';
 	private $wxIpList = [];
 	private $db_users = 'g_users';
+	private $is_menu = 0;
 	public function __construct($config)
 	{	
 		wwwLog();
@@ -29,7 +30,8 @@ class GzhClass
 	    		$this->access_token = self::getAccessToken();
 	    		$this->wxIpList = self::getWxIp();
 	 			if(!checkIp($this->wxIpList) && getIP() != '125.88.171.98') exit('IP forbid');
-	    		$this->decodeMsg();
+	 			if($this->is_menu) $this->setMenu();//创建菜单
+	    		$this->decodeMsg();//解析消息
 	    	}
 	    }else{
 	    	echo '验证失败';
@@ -175,19 +177,15 @@ class GzhClass
 			$this->replyData['items'] = $items;
 			self::printXmlNews($this->replyData);
 
-			return;
 		}elseif(strpos($this->content, '天气') !== false){
 			self::getTianqi();
 
-			return;
 		}elseif($this->content == '二维码'){
 			self::cQrcode();
 
-			return;
 		}else{
 			self::checkContent();
 
-			return;
 		}
 
 		return;
@@ -326,5 +324,43 @@ class GzhClass
 
 		echo $info;
 		return;
+	}
+	//菜单
+	function setMenu(){
+		$url = 'https://api.weixin.qq.com/cgi-bin/menu/create?access_token='.$this->access_token;
+		//微信平台不支持中文json格式，要么urlencode，要么json_encode 带参数，不转化中文
+		$menu = [
+			'button' => [
+				[ 	"type" => "click",
+					"name" => "歌曲",
+					"key" => "V1001_TODAY_MUSIC"
+				],
+				[	"name" => "菜单",
+					"sub_button" => [
+						[	"type" => "view",
+               				"name" => "搜索",
+               				"url" => "http://www.baidu.com/"
+               			],
+               			[	"type" => "view",
+			                "name" => "酷游娱乐",
+			                "url" => "http://gz.kuyou.com"
+			            ],
+			            [	"type" => "click",
+               				"name" => "赞一下我们",
+               				"key" => "V1001_GOOD"
+               			],
+					]
+				],
+				[	"type" => "click",
+					"name" => "个人",
+					"key" => "V1002_USER_CENTER"
+				],
+			],
+		];
+		$re = Curl::makeRequest($url, $menu, 'json');
+		$rs = json_decode($re, 1);
+		writeLog($re);
+		if($rs['errcode'] != 0)
+			exit('菜单创建失败:'.$re);
 	}
 }
