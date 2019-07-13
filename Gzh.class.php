@@ -10,6 +10,7 @@ class GzhClass
 	private $access_token = '';
 	private $wxIpList = [];
 	private $db_users = 'g_users';
+	private $db_menu = 'g_menu';
 	private $is_menu = 0;
 	public function __construct($config)
 	{	
@@ -132,6 +133,19 @@ class GzhClass
 				$content = $obj->EventKey > 2000 ? '永久二维码' : '临时二维码';
 				$this->replyData['content'] = $content.'用户欢迎你！';
 				self::printXmlText($this->replyData);
+			}//自定义菜单事件
+			elseif($this->event == 'click' || $this->event == 'view'){//点击事件
+				self::clickMenu($this->event, $obj->EventKey);
+				if($obj->EventKey == 'V1001_TODAY_MUSIC'){//歌曲菜单
+					$this->replyData['content'] = "歌曲模块，敬请期待！";
+					self::printXmlText($this->replyData);
+				}elseif ($obj->EventKey == 'V1001_GOOD'){//点赞
+					$this->replyData['content'] = "感谢您的点赞，祝您生活愉快！";
+					self::printXmlText($this->replyData);
+				}elseif ($obj->EventKey == 'V1002_USER_CENTER'){//用户中心
+					$this->replyData['content'] = "用户中心，敬请期待！";
+					self::printXmlText($this->replyData);
+				}
 			}
 
 		}elseif($this->msgType == 'text'){
@@ -343,7 +357,7 @@ class GzhClass
                			],
                			[	"type" => "view",
 			                "name" => "酷游娱乐",
-			                "url" => "http://gz.kuyou.com"
+			                "url" => "http://www.gzkuyou.com/"
 			            ],
 			            [	"type" => "click",
                				"name" => "赞一下我们",
@@ -362,5 +376,11 @@ class GzhClass
 		writeLog($re);
 		if($rs['errcode'] != 0)
 			exit('菜单创建失败:'.$re);
+	}
+
+	function clickMenu($type, $event_key){
+		$utime = time();
+		Mysql::insert($this->db_menu, compact('type', 'event_key', 'utime'));
+		return;
 	}
 }
