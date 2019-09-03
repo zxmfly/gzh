@@ -40,7 +40,7 @@ class Curl
         $is_en=FALSE, $protocol='http', $max_time = 10, $headerArr=array())
     { 
         if(substr(ltrim($url), 0, 5) == "https") $protocol = 'https';  
-        if($params['is_echo'] == 'ky_echo') {
+        if(isset($params['is_echo']) && $params['is_echo'] == 'ky_echo') {
             $print = TRUE;
             unset($params['is_echo']);
         }

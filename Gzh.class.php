@@ -17,14 +17,30 @@ class GzhClass
 		wwwLog();
 		$this->config = $config;
 		$data = getInputData();
-
 		if(empty($data)) die('error');
+		$path_info = $_SERVER['PATH_INFO'];
+		if($path_info){
+			if(!isset($data['code'])) die('error');
+			$f = substr($path_info, 1);
+			if($f == 'baseInfo'){
+				self::getUserBase($data);
+			}elseif($f == 'userInfo'){
+				self::getUserInfo($data);
+			}else{
+				die('访问错误');
+			}
+		}else{
+			self::checkWxMsg($data);
+		}
+	}
+
+	private function checkWxMsg($data){
 		$tmpArr = [$this->config['token'], $data['timestamp'], $data['nonce']];
 	    sort($tmpArr, SORT_STRING);
 	    $tmpStr = sha1( implode( $tmpArr ) );
 
 	    if($data['signature'] == $tmpStr){
-	    	if($data['echostr']){//第一次验证token
+	    	if(isset($data['echostr'])){//第一次验证token
 	    		echo $data['echostr'];
 	        	exit;
 	    	}else{
@@ -145,6 +161,11 @@ class GzhClass
 				}elseif ($obj->EventKey == 'V1002_USER_CENTER'){//用户中心
 					$this->replyData['content'] = "用户中心，敬请期待！";
 					self::printXmlText($this->replyData);
+				}elseif($obj->EventKey == 'BASE_INFO'){//获取网页授权基础信息
+					
+
+				}elseif($obj->EventKey == 'USER_INFO'){//网页授权获取详细信息
+
 				}
 			}
 
@@ -363,6 +384,14 @@ class GzhClass
                				"name" => "赞一下我们",
                				"key" => "V1001_GOOD"
                			],
+               			[	"type" => "click",
+               				"name" => "基础信息",
+               				"key" => "BASE_INFO"
+               			],
+               			[	"type" => "click",
+               				"name" => "详细信息",
+               				"key" => "USER_INFO"
+               			],
 					]
 				],
 				[	"type" => "click",
@@ -383,4 +412,63 @@ class GzhClass
 		Mysql::insert($this->db_menu, compact('type', 'event_key', 'utime'));
 		return;
 	}
+
+//网页授权
+	//用户访问网页，授权，微信回调code
+	function getUserCode($scope = 'snsapi_base'){
+		$appid = $this->config['appid'];
+		$secret = $this->config['secret'];
+		$back_url = "https://mlsgzm.geiniwan.com/gzh/";
+		$back_url .= $scope == 'snsapi_base' ? "baseInfo.php" : "userInfo.php";
+		$back_url = urlencode($back_url);
+		$url = "https://open.weixin.qq.com/connect/oauth2/authorize?appid={$appid}&redirect_uri={$back_url}&response_type=code&scope={$scope}&state=zxm_test#wechat_redirect";
+		$rs = curlGet($url);
+	}
+
+	private function getUserBase($data){//获取基础信息
+		$user_base = self::getUserInfoToken($data['code']);
+		echo "个人基础信息:".json_encode($user_base);
+	}
+
+	private function getUserInfo($data){//获取详细信息
+		$user_base = self::getUserInfoToken($data['code']);
+		$access_token = $user_base['access_token'];
+		$openid = $user_base['openid'];
+
+		$data = [
+			'access_token' => $access_token,
+			'openid' => $openid,
+			'lang' => 'zh_CN',
+		];
+
+		$url = "https://api.weixin.qq.com/sns/userinfo";
+		$rs = Curl::makeRequest($url, $data);
+
+		echo "个人详细信息:".$rs;
+	}
+
+	private function getUserInfoToken($code){
+		$cache_key = 'user_info_access_token_key'.$code;
+		$user_base = getCache($cache_key);
+		if($user_base) return $user_base;
+
+		$appid = $this->config['appid'];
+		$secret = $this->config['secret'];
+		$data = [
+			'appid' => $appid,
+			'secret' => $secret,
+			'code' => $code,
+			'grant_type' => 'authorization_code',
+		];
+		$url = "https://api.weixin.qq.com/sns/oauth2/access_token";
+		$re = Curl::makeRequest($url, $data);
+		$rs = json_decode($re, 1);
+
+		setCache($cache_key, $rs, 7200);
+
+		return $rs;
+	}
+
+//网页授权
+
 }

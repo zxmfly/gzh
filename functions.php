@@ -120,3 +120,41 @@ function wwwLog($str = ''){
 
     error_log(date("Y-m-d h:i:s")." {$str}\r\n",3,'./www_test.log');
 }
+
+
+/**
+ * curl方式 get数据
+ *
+ * @param mix $data
+ * @param string $url 全路径,如: http://127.0.0.1:8000/test
+ */
+function curlGet($url, $print = false, $max_time = 60, $params = array(), $protocol='http'){
+    if(substr(ltrim($url), 0, 5) == "https") $protocol = 'https';
+    if($params){
+        $params_str = http_build_query($params);
+        $connect = strpos($url, '?') ? '&' : '?';
+        $url .= $connect . $params_str;
+    }
+    $ch=curl_init();
+    curl_setopt($ch, CURLOPT_URL,$url);
+    curl_setopt($ch, CURLOPT_HEADER, false);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER,1);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+    curl_setopt($ch, CURLOPT_TIMEOUT,$max_time);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Expect:'));
+    if ('https' == strtolower($protocol))
+    {
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    }
+    //设置curl默认访问为IPv4
+    if(defined('CURLOPT_IPRESOLVE') && defined('CURL_IPRESOLVE_V4')){
+        curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+    }
+    $result = curl_exec($ch);
+    if($print){
+        var_dump($url);var_dump($result);var_dump(curl_error($ch));
+    }
+    curl_close($ch);
+    return $result;
+}
